@@ -1,0 +1,42 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Python build and package artifacts
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+*-env/
+
+# Generated car output
+runtime/
+
+# Third-party hardware library checkouts
+vendor/
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# Editors and operating-system files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local IPC/runtime files
+.lgd-*
+*.log
