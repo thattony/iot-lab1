@@ -120,8 +120,8 @@ planning steering arcs the chassis can execute.
 ## Reproduction commands
 
 ```bash
-cd ~/cs437-lab1-part2
-source ~/cs437-lab1-part2-env/bin/activate
+cd ~/project/cs437-lab1-part2
+source ~/env/bin/activate
 python scan_map.py
 python object_detection.py
 python autonomous.py --goal-forward 60 --goal-left 30

@@ -182,7 +182,7 @@ def main() -> int:
     try:
         from picarx import Picarx
     except ImportError:
-        print("PiCar-X library missing; activate ~/cs437-lab1-part2-env.", file=sys.stderr)
+        print("PiCar-X library missing; activate ~/env.", file=sys.stderr)
         return 2
 
     car = Picarx()
@@ -305,4 +305,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

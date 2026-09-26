@@ -1,0 +1,10 @@
+# Numerical, image-processing, and TensorFlow Lite runtime
+numpy>=2.2,<3
+Pillow>=11,<12
+ai-edge-litert==2.2.0
+opencv-python-headless==4.13.0.92
+
+# SunFounder PiCar-X hardware and vision libraries
+robot-hat @ git+https://github.com/sunfounder/robot-hat.git@2.5.x
+picar-x @ git+https://github.com/sunfounder/picar-x.git@2.1.x
+vilib @ git+https://github.com/sunfounder/vilib.git

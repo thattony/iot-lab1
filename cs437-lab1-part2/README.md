@@ -1,5 +1,11 @@
 # CS 437 Lab 1 Part 2
 
+## Installation
+
+On the Raspberry Pi, follow [RASPBERRY_PI_SETUP.md](RASPBERRY_PI_SETUP.md).
+Python dependencies are recorded in `requirements.txt`; system packages and
+the optional Robot HAT I2S amplifier require the separate setup steps.
+
 ## Step 6: advanced ultrasonic mapping
 
 The mapper sweeps the ultrasonic sensor from -70 to +70 degrees, takes five
@@ -13,8 +19,8 @@ On the Raspberry Pi, leave the car stationary with the ultrasonic sensor on
 the pan servo, place at least one box beside or in front of it, and run:
 
 ```bash
-cd ~/cs437-lab1-part2
-source ~/cs437-lab1-part2-env/bin/activate
+cd ~/project/cs437-lab1-part2
+source ~/env/bin/activate
 python scan_map.py
 ```
 
@@ -39,8 +45,8 @@ model. It prints detections and measured FPS, saves an annotated frame to
 On the Raspberry Pi:
 
 ```bash
-cd ~/cs437-lab1-part2
-source ~/cs437-lab1-part2-env/bin/activate
+cd ~/project/cs437-lab1-part2
+source ~/env/bin/activate
 
 # Safe one-frame camera/model check; this does not move the car.
 python object_detection.py --max-frames 1

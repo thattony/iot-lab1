@@ -53,7 +53,7 @@ class ObjectDetector:
             from ai_edge_litert.interpreter import Interpreter
         except ImportError as exc:
             raise RuntimeError(
-                "LiteRT is not installed. Activate ~/cs437-lab1-part2-env first."
+                "LiteRT is not installed. Activate ~/env first."
             ) from exc
 
         self.labels = load_labels(label_path)
@@ -159,7 +159,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     if cv2 is None:
-        print("OpenCV is missing. Activate ~/cs437-lab1-part2-env first.", file=sys.stderr)
+        print("OpenCV is missing. Activate ~/env first.", file=sys.stderr)
         return 2
     try:
         from picamera2 import Picamera2
