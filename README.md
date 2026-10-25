@@ -1,10 +1,51 @@
-# CS 437 Lab 1 Part 2
+# CS 437 Lab 1: Self-Driving PiCar-X
 
-## Installation
+Code for CS 437 Lab 1 Part 2 (Steps 6-9) on a SunFounder PiCar-X driven by a
+Raspberry Pi: ultrasonic mapping, camera object detection, Hybrid A* routing,
+and integrated self-driving.
 
-On the Raspberry Pi, follow [RASPBERRY_PI_SETUP.md](RASPBERRY_PI_SETUP.md).
+## Project layout
+
+| Path | Purpose |
+|---|---|
+| `scan_map.py`, `mapping.py` | Step 6: ultrasonic sweep and 2-D occupancy grid |
+| `object_detection.py`, `models/` | Step 7: camera detector with the COCO SSD MobileNet model |
+| `planner.py` | Step 8: Hybrid A* route planner |
+| `autonomous.py`, `calibrate_speed.py` | Steps 8-9: scan, plan, and drive loop; speed calibration |
+| `test_*.py` | Unit tests; they use mocks and never move the car |
+| `testd.py` | Manual check of the pan-servo direction (moves the servo) |
+| `run_safe.sh` | Launcher that activates `~/env` and restores the terminal |
+| `archive/` | Earlier `autonomous.py` that also waited for people |
+| `runtime/` | Generated maps, scans, and camera frames (not in git) |
+| `vendor/` | Optional local SunFounder library checkouts (not in git) |
+
+## Setup
+
+Prepare the Raspberry Pi with [RASPBERRY_PI_SETUP.md](RASPBERRY_PI_SETUP.md).
 Python dependencies are recorded in `requirements.txt`; system packages and
 the optional Robot HAT I2S amplifier require the separate setup steps.
+
+```bash
+cd ~/cs437_lab1
+source ~/env/bin/activate
+python -m unittest -v
+```
+
+## Terminal-safe launcher
+
+`run_safe.sh` automatically changes to the project directory and activates
+`~/env`. If an interactive keyboard program is interrupted while the terminal is in
+raw/cbreak mode, use `stty sane` once to recover. To prevent it, launch any
+Python program through the supplied terminal-safe wrapper:
+
+```bash
+./run_safe.sh autonomous.py --help
+./run_safe.sh vendor/picar-x/example/3.keyboard_control.py
+```
+
+The second example needs a local `vendor/picar-x` checkout. The wrapper
+restores the exact original terminal settings on normal exit, errors,
+`Ctrl+C`, hangup, or termination.
 
 ## Step 6: advanced ultrasonic mapping
 
@@ -19,7 +60,7 @@ On the Raspberry Pi, leave the car stationary with the ultrasonic sensor on
 the pan servo, place at least one box beside or in front of it, and run:
 
 ```bash
-cd ~/project/cs437-lab1-part2
+cd ~/cs437_lab1
 source ~/env/bin/activate
 python scan_map.py
 ```
@@ -31,8 +72,12 @@ Outputs are written under `runtime/mapping/`:
 - `occupancy.npy`: full unknown/free/occupied grid for Step 8
 - `scan.json`: raw angle/distance data and pose metadata
 
-The mapping program keeps the drive motors stopped. If the resulting map is
-mirrored, rerun it with `python scan_map.py --invert-pan`.
+The mapping program keeps the drive motors stopped. The pan direction is
+calibrated for this car: negative servo angles point left and are mapped to
+positive (left) map angles. `--invert-pan` is still accepted so older
+commands keep working, but it no longer changes the map. To re-check the
+servo direction on a different car, run `python testd.py`, which moves the
+pan servo.
 
 ## Step 7: object detection
 
@@ -40,12 +85,13 @@ The detector uses the Pi camera, OpenCV, and the quantized COCO SSD MobileNet
 model. It prints detections and measured FPS, saves an annotated frame to
 `runtime/latest.jpg`, and writes structured output to
 `runtime/detections.json`. A person, stop sign, or traffic light produces a
-`STOP` action for the later self-driving integration.
+`STOP` action in the standalone detector; the self-driving loop in Step 9
+reacts only to stop signs.
 
 On the Raspberry Pi:
 
 ```bash
-cd ~/project/cs437-lab1-part2
+cd ~/cs437_lab1
 source ~/env/bin/activate
 
 # Safe one-frame camera/model check; this does not move the car.
@@ -67,9 +113,10 @@ The camera code never starts the PiCar-X motors.
 
 `planner.py` implements Hybrid A*, an A* derivation whose graph state contains
 the car's grid position and heading. Its edges are short arcs at the five
-steering angles supported by the controller. Obstacles are expanded by an
-18 cm clearance radius before planning so the route accounts for the physical
-width of the car.
+steering angles supported by the controller (-28, -14, 0, 14, and 28 degrees).
+Obstacles are expanded by a clearance radius before planning so the route
+accounts for the physical width of the car; `autonomous.py` uses 5 cm by
+default (`--clearance-cm`).
 
 Test mapping and routing without moving the car:
 
@@ -104,10 +151,12 @@ python autonomous.py \
 ```
 
 The controller rescans and reruns Hybrid A* after every 8 cm motion segment.
-The ultrasonic sensor triggers an immediate stop inside 22 cm. The camera is
-checked before each motion: a person makes the car wait until the person is
-gone, and a stop sign makes it halt for three seconds. `Ctrl+C` stops the
-motors and centers both steering and pan servos.
+The ultrasonic sensor triggers an immediate stop inside 15 cm. Obstacles are
+expanded by a 5 cm planning clearance. Both values can be overridden with
+`--emergency-distance-cm` and `--clearance-cm`. The camera is checked before
+each motion, and a stop sign makes the car halt for three seconds
+(`--stop-seconds`). `Ctrl+C` stops the motors, centers both steering and pan
+servos, and restores the terminal mode.
 
 For the two routing demonstrations required by the rubric, use different
 obstacle layouts and destinations, for example:
@@ -121,6 +170,3 @@ python autonomous.py --execute --goal-forward 60 --goal-left 30 \
 python autonomous.py --execute --goal-forward 70 --goal-left -30 \
   --power 20 --cm-per-second MEASURED_VALUE
 ```
-
-If steering bends opposite the yellow route, add `--invert-steering`. If the
-map itself is mirrored, add `--invert-pan`.

@@ -120,7 +120,7 @@ planning steering arcs the chassis can execute.
 ## Reproduction commands
 
 ```bash
-cd ~/project/cs437-lab1-part2
+cd ~/cs437_lab1
 source ~/env/bin/activate
 python scan_map.py
 python object_detection.py

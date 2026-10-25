@@ -22,7 +22,8 @@ env/
 # Generated car output
 runtime/
 
-# Third-party hardware library checkouts
+# Optional local checkouts of the SunFounder libraries
+# (requirements.txt installs them into the virtual environment)
 vendor/
 
 # Environment variables and local secrets
@@ -36,6 +37,9 @@ vendor/
 *.swp
 *.swo
 .DS_Store
+
+# Claude Code per-user settings
+.claude/settings.local.json
 
 # Local IPC/runtime files
 .lgd-*

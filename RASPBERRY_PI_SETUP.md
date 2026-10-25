@@ -27,9 +27,12 @@ python -m pip install --upgrade pip
 ## 3. Install the Python dependencies
 
 ```bash
-cd ~/project/cs437-lab1-part2
+git clone git@github.com:thattony/iot-lab1.git ~/cs437_lab1
+cd ~/cs437_lab1
 python -m pip install -r requirements.txt
 ```
+
+Skip the `git clone` line if `~/cs437_lab1` already exists.
 
 `requirements.txt` installs the `robot-hat` 2.5.x and `picar-x` 2.1.x
 branches, Vilib, OpenCV, and the LiteRT inference runtime. A virtual environment
@@ -60,6 +63,6 @@ already exists, update that checkout instead of cloning a second copy.
 ## Daily use
 
 ```bash
-cd ~/project/cs437-lab1-part2
+cd ~/cs437_lab1
 source ~/env/bin/activate
 ```
