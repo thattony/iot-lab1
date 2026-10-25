@@ -81,6 +81,7 @@ class OccupancyGrid:
         self.width = size_cm // resolution_cm
         self.origin_cm = -size_cm / 2.0
         self.cells = np.full((self.width, self.width), UNKNOWN, dtype=np.int8)
+        self._clear_streak = np.zeros_like(self.cells, dtype=np.uint8)
 
     def world_to_cell(self, x_cm: float, y_cm: float) -> tuple[int, int]:
         return (
@@ -114,8 +115,9 @@ class OccupancyGrid:
         *,
         max_range_cm: float = 150.0,
         sensor_offset_cm: float = 8.0,
-        interpolate_max_gap_cm: float = 25.0,
+        interpolate_max_gap_cm: float = 10.0,
         interpolate_max_delta_cm: float = 15.0,
+        replace_observed_sectors: bool = False,
     ) -> None:
         """Insert one ultrasonic sweep into the occupancy grid.
 
@@ -127,6 +129,33 @@ class OccupancyGrid:
         sensor_x = pose.x_cm + sensor_offset_cm * math.cos(pose.yaw_rad)
         sensor_y = pose.y_cm + sensor_offset_cm * math.sin(pose.yaw_rad)
         endpoints: list[tuple[RangeReading, float, float] | None] = []
+        observed_free = np.zeros_like(self.cells, dtype=bool)
+        observed_hit = np.zeros_like(self.cells, dtype=bool)
+        if replace_observed_sectors:
+            # Replace old geometry only in angular bins actually observed.
+            # Erased cells become UNKNOWN, never inferred free space. Preserve
+            # occluded cells beyond the return and bins with missing echoes.
+            yy, xx = np.indices(self.cells.shape)
+            dx = self.origin_cm + (xx + 0.5) * self.resolution_cm - sensor_x
+            dy = self.origin_cm + (yy + 0.5) * self.resolution_cm - sensor_y
+            bearings = np.arctan2(dy, dx) - pose.yaw_rad
+            ranges = np.hypot(dx, dy)
+            angles = sorted(set(item.angle_deg for item in readings))
+            for item in readings:
+                distance = item.distance_cm
+                if distance is None or not math.isfinite(distance) or distance <= 0:
+                    continue
+                gaps = [abs(item.angle_deg - angle) for angle in angles if angle != item.angle_deg]
+                half_bin = min(7.5, min(gaps) / 2) if gaps else 0.5
+                delta = (bearings - math.radians(item.angle_deg) + math.pi) % (2 * math.pi) - math.pi
+                # Include cells intersected by the ray even when their centers
+                # fall just outside the angular bin due to rasterization.
+                cell_margin = np.arctan2(self.resolution_cm / math.sqrt(2), np.maximum(ranges, 1e-6))
+                covered = (np.abs(delta) <= math.radians(half_bin) + cell_margin) & (
+                    ranges <= min(distance, max_range_cm) + self.resolution_cm
+                )
+                self.cells[covered & (self.cells == OCCUPIED)] = UNKNOWN
+                self._clear_streak[covered] = 0
 
         for reading in readings:
             distance = reading.distance_cm
@@ -143,7 +172,7 @@ class OccupancyGrid:
             free_cells = ray[:-1] if hit else ray
             for cell in free_cells:
                 if self.inside(cell):
-                    self.cells[cell[1], cell[0]] = FREE
+                    observed_free[cell[1], cell[0]] = True
             endpoints.append((reading, end_x, end_y) if hit else None)
 
         # Add occupied endpoints after all free rays so an adjacent beam cannot
@@ -153,7 +182,7 @@ class OccupancyGrid:
                 continue
             cell = self.world_to_cell(endpoint[1], endpoint[2])
             if self.inside(cell):
-                self.cells[cell[1], cell[0]] = OCCUPIED
+                observed_hit[cell[1], cell[0]] = True
 
         # The manual asks us to interpolate between nearby returns. Only join
         # similar adjacent readings to avoid drawing walls across doorways.
@@ -169,7 +198,19 @@ class OccupancyGrid:
             ):
                 for cell in self._line_cells(x1, y1, x2, y2):
                     if self.inside(cell):
-                        self.cells[cell[1], cell[0]] = OCCUPIED
+                        observed_hit[cell[1], cell[0]] = True
+
+        # Count evidence once per sweep, not once per overlapping beam.
+        # Unknown/timeout observations retain obstacles but break a clearing
+        # streak. A hit always wins over a free ray in the same sweep.
+        clear_evidence = observed_free & ~observed_hit
+        self._clear_streak[~clear_evidence] = 0
+        self._clear_streak[clear_evidence] = np.minimum(
+            self._clear_streak[clear_evidence].astype(np.uint16) + 1, 3
+        )
+        may_clear = (self.cells != OCCUPIED) | (self._clear_streak >= 3)
+        self.cells[clear_evidence & may_clear] = FREE
+        self.cells[observed_hit] = OCCUPIED
 
     def inflated_obstacles(self, clearance_cm: float) -> np.ndarray:
         """Return occupied cells expanded by the car's safety clearance."""
@@ -185,10 +226,13 @@ class OccupancyGrid:
                     source_y0 + dy : source_y1 + dy,
                     source_x0 + dx : source_x1 + dx,
                 ] |= self.cells[source_y0:source_y1, source_x0:source_x1] == OCCUPIED
-        blocked[:radius, :] = True
-        blocked[-radius:, :] = True
-        blocked[:, :radius] = True
-        blocked[:, -radius:] = True
+        # With radius == 0, ``-radius`` is also zero and ``blocked[-0:]``
+        # would incorrectly mark the entire grid as blocked.
+        if radius > 0:
+            blocked[:radius, :] = True
+            blocked[-radius:, :] = True
+            blocked[:, :radius] = True
+            blocked[:, -radius:] = True
         return blocked
 
     def save(

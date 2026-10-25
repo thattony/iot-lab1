@@ -43,10 +43,14 @@ def sweep(
             distance = sample_distance(
                 car, sample_count=sample_count, sample_delay_s=sample_delay_s
             )
-            map_angle = -servo_angle if invert_pan else servo_angle
+            # Calibrated on this car: negative pan commands physically point
+            # left, while map coordinates use positive angles for left.
+            # Keep invert_pan accepted for legacy callers, but never invert
+            # twice when an old command includes --invert-pan.
+            map_angle = -servo_angle
             readings.append(RangeReading(map_angle, distance))
             display = "timeout" if distance is None else f"{distance:.1f} cm"
-            print(f"servo {servo_angle:+4d} deg -> {display}", flush=True)
+            print(f"servo {servo_angle:+4d} deg -> map {map_angle:+4d} deg -> {display}", flush=True)
     finally:
         car.set_cam_pan_angle(0)
         car.stop()
@@ -68,7 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resolution", type=int, default=2)
     parser.add_argument("--sensor-offset", type=float, default=8.0)
     parser.add_argument("--invert-pan", action="store_true",
-                        help="Mirror scan angles if positive servo motion points right")
+                        help="Legacy option; calibrated pan-angle inversion is now always enabled")
     return parser.parse_args()
 
 

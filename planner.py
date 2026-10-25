@@ -69,6 +69,26 @@ class HybridAStar:
                 return False, end
         return True, end
 
+    def diagnostics(self, start: Pose, goal: tuple[float, float]) -> dict:
+        """Return compact facts that explain common no-route failures."""
+        first_motions = {}
+        for steering_deg in self.steering_options:
+            valid, end = self._motion_is_valid(start, steering_deg)
+            first_motions[f"{steering_deg:+.0f}"] = {
+                "valid": valid,
+                "end_x_cm": round(end.x_cm, 2),
+                "end_y_cm": round(end.y_cm, 2),
+                "end_yaw_deg": round(math.degrees(end.yaw_rad), 2),
+            }
+        return {
+            "start_is_free": self._valid(start),
+            "goal_is_free": self._valid(Pose(goal[0], goal[1])),
+            "first_motions": first_motions,
+            "feasible_first_steering_deg": [
+                float(value) for value, result in first_motions.items() if result["valid"]
+            ],
+        }
+
     @staticmethod
     def _distance(pose: Pose, goal: tuple[float, float]) -> float:
         return math.hypot(pose.x_cm - goal[0], pose.y_cm - goal[1])
@@ -126,4 +146,3 @@ class HybridAStar:
                 priority = cost + self._distance(end, goal)
                 heapq.heappush(frontier, (priority, next(counter), child))
         return None
-

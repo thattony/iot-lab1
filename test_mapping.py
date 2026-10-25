@@ -7,6 +7,45 @@ from mapping import FREE, OCCUPIED, UNKNOWN, OccupancyGrid, Pose, RangeReading
 
 
 class OccupancyGridTest(unittest.TestCase):
+    def test_sector_replacement_prevents_shifted_hit_accumulation(self):
+        grid = OccupancyGrid(size_cm=100, resolution_cm=1)
+        for distance in (20, 21, 22, 23):
+            grid.update_scan(Pose(), [RangeReading(0, distance)], sensor_offset_cm=0,
+                             replace_observed_sectors=True, interpolate_max_gap_cm=0)
+        self.assertEqual(int((grid.cells == OCCUPIED).sum()), 1)
+        grid.update_scan(Pose(), [RangeReading(0, None)], sensor_offset_cm=0,
+                         replace_observed_sectors=True)
+        self.assertEqual(int((grid.cells == OCCUPIED).sum()), 1)
+
+    def test_obstacle_requires_three_clear_sweeps(self):
+        grid = OccupancyGrid(size_cm=100, resolution_cm=1)
+        cell = grid.world_to_cell(10, 0)
+        def scan(readings):
+            grid.update_scan(Pose(), readings, sensor_offset_cm=0)
+        scan([RangeReading(0, 10)])
+        for _ in range(2):
+            scan([RangeReading(0, 30)] * 5)
+            self.assertEqual(grid.cells[cell[1], cell[0]], OCCUPIED)
+        scan([RangeReading(0, None)])
+        self.assertEqual(grid.cells[cell[1], cell[0]], OCCUPIED)
+        for _ in range(2):
+            scan([RangeReading(0, 30)])
+            self.assertEqual(grid.cells[cell[1], cell[0]], OCCUPIED)
+        scan([RangeReading(0, 30)])
+        self.assertEqual(grid.cells[cell[1], cell[0]], FREE)
+
+    def test_hit_overrides_clear_evidence(self):
+        grid = OccupancyGrid(size_cm=100, resolution_cm=1)
+        cell = grid.world_to_cell(10, 0)
+        for _ in range(4):
+            grid.update_scan(Pose(), [RangeReading(0, 30), RangeReading(0, 10)],
+                             sensor_offset_cm=0)
+        self.assertEqual(grid.cells[cell[1], cell[0]], OCCUPIED)
+
+    def test_zero_clearance_does_not_block_empty_grid(self):
+        grid = OccupancyGrid(size_cm=100, resolution_cm=2)
+        self.assertFalse(grid.inflated_obstacles(0).any())
+
     def test_forward_hit_marks_endpoint_and_free_ray(self):
         grid = OccupancyGrid(size_cm=100, resolution_cm=1)
         pose = Pose()
